@@ -1,0 +1,6 @@
+external:
+
+Est créé par market
+Génère un événement aléatoire parmis une liste d'évènement possibles ou ne fait rien
+Renvoie les données de l'évènement s'il a eu lieu
+meurt

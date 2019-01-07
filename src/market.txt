@@ -1,0 +1,18 @@
+market:
+
+Paramètres:
+currentPrice
+externalEvents
+
+Arguments:
+weatherValues
+queue
+
+Détail du cycle à chaque front d'horloge:
+Prend en compte les conditions météorologiques
+Créé le processus fils external qui génère un événement aléatoire ou ne fait rien
+Attend la fin de l'exécution de external et prend en compte l'éventuel événement créé
+Attend la fin de la répartition de l'énergie des maisons entre elle
+Vide la queue et poste les prix correspondant (pour achat ou vente) sous la forme [Id,Prix(pos ou neg)]
+Calcule le nouveau prix en fonction de currentPrice, externalEvent, weatherWalues et offre/demande
+Attend la prochaine horloge

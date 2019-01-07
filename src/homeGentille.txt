@@ -1,0 +1,45 @@
+home:
+
+Représente les maisons conssomant et produisant de l'énergie.
+Dans un premier temps nous considérerons que toutes les masions donnent leur énergie s'il y a des demandes et vendent au marché sinon.
+Les utilisateurs favorisent la collaboration.
+
+Arguments:
+weatherValues
+queue
+
+Paramètres:
+Initial production
+Actual production
+Initial consumption
+Actual consumption
+Id
+Money balance=Somme(recettes-dépenses)
+Energy balance=Actual production - Actual consumption
+
+Communique avec les autres maisons et avec le market via la queue.
+Les données postées dans la queue sont des tuples de la forme [Id,Ebalance]
+Ebalance est négatif si la maison demande de l'énergie, positif si elle en offre.
+
+Données communiquées avec l'opérator (terminal):
+Id
+Energy balance
+Money balance
+On verra au fil du projet ce qu'on décide d'afficher dans le terminal pour rendre la simulation plus intéressante.
+
+Détail du cycle à chaque front d'horloge:
+    Récupère le weather et calcul le changement induit sur consumption et production
+    Calcul de l'Ebalance: Actual production - Actual consumption
+    Si Ebalance == 0, fini
+    Si Ebalance < 0, met dans la queue sous la forme [Id,Ebalance]
+    wait() sémaphore, le temps que toutes les maisons postent leur demande
+    Si Ebalance > 0, lit la queue tant que la réponse aux demande est possible.
+        | ajoute son offre à la queue s'il n'y a plus de demande, le marché interprétera ceci comme une vente.
+    wait() sémaphore que toutes les offres soient prises en compte
+    Si mon Id est dans la queue , Ebalance=queue.get(), on prend en compte la réponse à notre demande
+    Sinon Ebalance=0
+    Si Ebalance !=0, queue.put(Ebalance)
+    Ebalance=0
+    //A ce stade, la queue contient exclusivement des offres ou des demandes à destination du marché.
+    Attend la réponse du marché pour connaitre le prix qu'elle paye ou gagne, Mbalance+=prix
+    Attend horloge suivante

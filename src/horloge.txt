@@ -1,0 +1,4 @@
+horloge:
+
+Envoie un top toutes les 5 secondes environ à tous les processus pour les synchroniser.
+Les sémaphores permettront aux processus de rester synchronisés au cours d'un même cycle.
