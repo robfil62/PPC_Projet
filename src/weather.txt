@@ -1,0 +1,8 @@
+weather:
+
+Arguments:
+weatherValues
+
+Détail du cycle à chaque front d'horloge:
+Met a jour aléatoirement les valeurs de météo
+Attend la prochaine horloge

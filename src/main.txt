@@ -1,0 +1,16 @@
+main:
+
+Création de la shared memory et des variables globales:
+weatherValues = Création des multiprocessing.Value() (ou multiprocessing.Array()) qui contiendront
+les données de météo et seront donc modifiées par le processus weather.
+queue=Queue() qui permettra au marché et aux maisons de s'envoyer des données.
+
+
+Création des processus:
+weather(args=(weatherValues))
+market(args=(weatherValues,queue))
+home(args=(weatherValues,queue))
+
+Lancement des processus:
+processus.run()
+On décidera plus tard des conditions d'arrêt de la simulation.
