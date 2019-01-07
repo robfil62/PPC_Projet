@@ -3,21 +3,21 @@ import time
 import random
 import multiprocessing
 
-nmbHome=50
+nmbHome=5
 nmbTour=3
-delai=10
+delai=4
 def Home(ID,lockQueue,lockCount,queue,count,market_OK,lockWrite,clock_ok):
     Money_Bal = 0
 
     Id = ID
-    while clock_ok.wait(1.5*delai):
+    while clock_ok.wait(1.5*delai): #Attend le top de la clock, et si elle attend plus de 1.5*delai, sort et meurt
 
         flag_Market = False
         neg_Flag = False
 
         ##Calcul Prod et Cons avec weather
-        Prod = random.randrange(1, 5)
-        Cons = random.randrange(1, 5)
+        Prod = random.randrange(1, 5)   #Production aléatoire
+        Cons = random.randrange(1, 5)   #Consommation aléatoire
         Energy_Bal = Prod - Cons  # Calcul de Energy_Balance pour chaque Home
         with lockWrite:
             print("Energy n°", Id, " : ", Energy_Bal)
@@ -59,67 +59,60 @@ def Home(ID,lockQueue,lockCount,queue,count,market_OK,lockWrite,clock_ok):
             True
 
         if Energy_Bal < 0: # Si la Home est en déficit, regarde si quelqu'un à répondu à sa demande :
-            Tab=[]
+            Tab=[] #Crée un tableau où elle va mettre toutes les demandes qui ne la concerne pas
             with lockQueue:
                 while not queue.empty() or queue.qsize()!=0 : # Tant que la queue n'est pas vide
-                    demande = queue.get()
+                    demande = queue.get() #Récupère une demande
                     if demande[0] == Id:  # Regarde si la demande nous concerne
                         Energy_Bal = demande[1]  # Si oui, met à jour son Energy_Bal
                         neg_Flag = True
                         break
-                    else:
+                    else:       #Si non, l'ajoute à son tableau
                         Tab.append(demande)
 
                 for d in Tab:
-                    queue.put(d)
+                    queue.put(d)    #Une fois sortie, replace toutes les demandes de son tableau dans la queue
 
             if neg_Flag == False:  # Si la queue est vide et qu'elle n'a pas trouvé de demande la concernant
-                Energy_Bal = 0  # Sa demande a été traitée entiérement, donc Energy_Bal passe à 0
+                Energy_Bal = 0  # Sa demande a été traitée entiérement, donc son Energy_Bal passe à 0
 
 
-        if Energy_Bal != 0:
+        if Energy_Bal != 0:     #Une fois toutes les demandes traitées, si elles ont encore besoin d'énergies ou peuvent encore en donner
             with lockQueue:
-                queue.put([Id, Energy_Bal])
-                flag_Market = True
-            Energy_Bal = 0
+                queue.put([Id, Energy_Bal]) #Place leur énergie dans la queue à destination du market
+                flag_Market = True  #Si elles ont placées quelque chose pour le market, elles iront chercher la réponse de celui-ci
+            Energy_Bal = 0  #Elle achète ou vend son énergie pour être à 0
 
 
         with lockCount:
             count.value += 1  # Annonce qu'elle est prête
 
+        neg_Flag = False    #Réinitialisation
+####### A ce stade, la queue ne contient que des demandes et des offres pour le marché ##########
 
-        neg_Flag = False
-
-
-
-
-
-
-
-        ########## A ce stade, la queue ne contient que des demandes et des offres pour le marché ##########
-
-        while market_OK.value == False:
+        while market_OK.value == False: #Attend la réponse du market
             True
 
-        if flag_Market :
-            Tab2=[]
+        if flag_Market :    #Si elle ont traité avec le marché
+            Tab2=[] #Crée un tableau pour placer les demandes ne les concernant pas
             with lockQueue:
-                while flag_Market == True:
-                    demande = queue.get()
-                    if demande[0] == Id:
-                        Money_Bal += demande[1]
-                        flag_Market = False
+                while flag_Market == True:  #Tant qu'elles n'ont pas récupéré leur réponse
+                    demande = queue.get()   #Récupère la première réponse dans la queue
+                    if demande[0] == Id:    #Si elle nous concerne
+                        Money_Bal += demande[1] #Modifie sa Money_Balance
+                        flag_Market = False     #Elle a récupéré sa réponse, donc plus besoin de regarder le market
                     else:
-                        Tab2.append(demande)
+                        Tab2.append(demande) #Sinon, l'ajoute à son tableau
 
                 for d in Tab2:
-                    queue.put(d)
+                    queue.put(d)    #Une fois sortie, replace toutes les demandes ne la concernant pas
 
-        count.value=0
+        count.value=0   #Réinitialisation du compteur ici, car il ne sera plus modifié dans ce tour d'horloge
 
         with lockWrite:
             print("Money n°", Id, " : ", Money_Bal)
-        ###Wait clock
+
+#############Wait clock################################
 
 
 
