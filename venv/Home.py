@@ -3,12 +3,17 @@ import time
 import random
 import multiprocessing
 
-nmbHome=5
-nmbTour=5
-delai=4
-starting_price=0.145
-gamma=0.99
-theta=0.01
+nmbHome=5 #Définit le nombre de maisons
+nmbTour=5   #Définit le nombre de tour avant l'arrêt de la simulation
+delai=4     #Définit le temps d'attente entre chaque top d'horloge
+starting_price=0.145    #Prix initiale
+
+#Pour le calcul du prix :
+gamma=0.99  #Coefficient influence du prix précédent
+alpha=0.25  #Coefficient influence de la température
+beta=0.25   #Coefficient influence du vent
+theta=0.05  #Coefficient influence des échanges au tour précédent
+
 def Home(ID,lockQueue,lockCount,queue,count,market_OK,lockWrite,clock_ok,temp,wind,weather_ok):
     Money_Bal = 0
     Id = ID
@@ -18,8 +23,8 @@ def Home(ID,lockQueue,lockCount,queue,count,market_OK,lockWrite,clock_ok,temp,wi
         neg_Flag = False
 
         weather_ok.wait()
-        Prod = random.randrange(1.0, 10.0) * wind[1]  #Production aléatoire
-        Cons = random.randrange(1.0, 10.0) *1/temp[1]  #Consommation aléatoire
+        Prod = random.randrange(1.0, 10.0) * wind[1]  #Production aléatoire (événements aléatoire dans la maison) + influence du vent
+        Cons = random.randrange(1.0, 10.0) *temp[1]  #Consommation aléatoire (événements aléatoire dans la maison) + influence de la température (inversement proportionnel)
         Energy_Bal = Prod - Cons  # Calcul de Energy_Balance pour chaque Home
         with lockWrite:
             print("Energy n°", Id, " : ", Energy_Bal)
@@ -35,10 +40,11 @@ def Home(ID,lockQueue,lockCount,queue,count,market_OK,lockWrite,clock_ok,temp,wi
                 count.value += 1  # Ne fais rien et annonce qu'elle a terminé de remplir
 
         while count.value < nmbHome:  # Attend que toutes les Homes aient rempli la queue avec les demandes
-            True
-        clock_ok.clear()
-        weather_ok.clear()
+            pass
 
+        clock_ok.clear()    #Réinitialise le flag de l'événement clock
+        weather_ok.clear()  #Reinitialise le flage de l'événement weather
+###########Les réinitialisation se font ici, une fois que toutes les homes ont utilisé les flags (Si on les fait avant, certaines homes vont restées bloquer à l'attente du flag)
 
         if Energy_Bal > 0:  # Si la Home est en surplus :
             with lockQueue:
@@ -83,7 +89,6 @@ def Home(ID,lockQueue,lockCount,queue,count,market_OK,lockWrite,clock_ok,temp,wi
         if Energy_Bal != 0:     #Une fois toutes les demandes traitées, si elles ont encore besoin d'énergies ou peuvent encore en donner
             with lockQueue:
                 queue.put([Id, Energy_Bal]) #Place leur énergie dans la queue à destination du market
-                print(Energy_Bal)
                 flag_Market = True  #Si elles ont placées quelque chose pour le market, elles iront chercher la réponse de celui-ci
             Energy_Bal = 0  #Elle achète ou vend son énergie pour être à 0
 
@@ -92,10 +97,11 @@ def Home(ID,lockQueue,lockCount,queue,count,market_OK,lockWrite,clock_ok,temp,wi
             count.value += 1  # Annonce qu'elle est prête
 
         neg_Flag = False    #Réinitialisation
+
 ####### A ce stade, la queue ne contient que des demandes et des offres pour le marché ##########
 
         while market_OK.value == False: #Attend la réponse du market
-            True
+            pass
 
         if flag_Market :    #Si elle ont traité avec le marché
             Tab2=[] #Crée un tableau pour placer les demandes ne les concernant pas
@@ -116,64 +122,63 @@ def Home(ID,lockQueue,lockCount,queue,count,market_OK,lockWrite,clock_ok,temp,wi
         with lockWrite:
             print("Money n°", Id, " : ", Money_Bal)
 
-#############Wait clock################################
-
 
 def Market(queue,count,market_OK,clock_ok,temp,wind):
     currentPrice=starting_price
     moy_exchange=0.0
     Exchange=0.0
-    while clock_ok.wait(1.5*delai):
-        market_OK.value=False
-        internal=temp[0]*temp[1]+wind[0]*wind[1]-theta*moy_exchange
-        external=0
-        currentPrice=gamma*currentPrice+internal+external
+    while clock_ok.wait(1.5*delai):     #Attend le top de la clock au maximum pendant 1.5*delai
+        market_OK.value=False       #Annonce qu'il n'a pas mis à jour la queue avec les prix
+        print("influence exchance",theta*moy_exchange,"influence temp",temp[0]*temp[1],"inf wind",wind[0]*wind[1])
+        internal=alpha*temp[1]+beta*wind[1]-theta*moy_exchange #Calcul les effets internes(weather+echanges au tour précédent)
+        external=0  #Calcul les effets externes
+        currentPrice=gamma*currentPrice+internal+external #Calcul le nouveau prix
 
-        while count.value<3*nmbHome:
-            True
-        size=queue.qsize()
-        tab=[]
+        while count.value<3*nmbHome:    #Attend que toutes les homes aient mis leurs demandes pour le marché dans le queue
+            pass
+
+        size=queue.qsize()  #Compte le nombre de demande qu'il a réaliser
+        tab=[]  #Initialise son tableau pour stocker les demandes (permet le calcul de la moyenne des echanges)
 
         for i in range(0,size):
-            demande=queue.get()
-            print("demande",demande[1])
-            tab.append(demande)
+            demande=queue.get() #Récupère le demande
+            tab.append(demande) #L'ajoute à son tableau
 
         for d in tab :
-            queue.put([d[0],d[1]*currentPrice])
+            queue.put([d[0],d[1]*currentPrice]) #Place l'argent correspondant aux demandes dans la queue
 
-        print(currentPrice,moy_exchange,Exchange)
-        market_OK.value=True
-        Exchange=0.0
+        print("price",currentPrice,"moy",moy_exchange)
+        market_OK.value=True    #Annonce que la queue est à jour (contient les prix)
+        Exchange=0.0    #Réinitialise le nombre d'échanges (Achats+Ventes)
         for i in tab:
-            Exchange+=i[1]
+            Exchange+=i[1]  #Additionne tous les échanges (Achats+Ventes)
 
-        moy_exchange=Exchange/len(tab)
+        moy_exchange=Exchange/size  #Calcul la moyenne des échanges du tour
 
 def Clock(clock_ok,):
     c=0
-    while c<nmbTour:
-        clock_ok.set()
-        c+=1
+    while c<nmbTour:                    #Tant qu'on a pas fait tous les tours :
+        clock_ok.set()                  #Lance un top
+        c+=1                            #Incrément le compteur
         temps=time.time()
-        while time.time()-temps<delai:
+        while time.time()-temps<delai:  #Attend le delai définit avant de recommencer
             time.sleep(2)
         print("**********************************")
 
 
 def Weather(temp,wind,clock_ok,weather_ok):
-    temp[0]=0.001
-    wind[0]=0.001
-    while clock_ok.wait(1.5*delai):
-        temp[1]=round(random.gauss(10.0,15.0),2)
-        wind[1]=round(random.gauss(20.0,15.0),2)
+    temp[0] = alpha #coef influence temperature
+    wind[0] = beta  #coef influence vent
+    while clock_ok.wait(1.5*delai): #Attend le top au maximum pendant 1.5 fois le delai
+        temp[1]=round(random.gauss(10.0,5.0),2)    #Température au tour actuel (99% entre -5 et 25 degrés)
+        wind[1]=round(random.gauss(20.0,5.0),2)    #Vent au tour actuel (99% entre 5.0 et 35.0 km/h)
 
         print("TEMP:",temp[1],"wind:",wind[1])
-        temp[1]=(temp[1]+6.0)/18.0
-        wind[1]=(wind[1])/20.0
+        temp[1]=1/((temp[1]+6.0)/(18.0+6.0)) #On ne veut que des valeurs positives (donc +6) et on estime qu'une température <= à 18°C est idéal pour la consommation
+        wind[1]=(wind[1])/20.0  #On estime qu'un vent soufflant à plus de 20.0km/h est idéal pour la production
         print(temp[1],wind[1])
-        weather_ok.set()
-        time.sleep(delai)
+        weather_ok.set()    #Prête
+        time.sleep(delai/2) #Attend un certain délai (tant que la clock soit passé à False)
 
 if __name__=="__main__":
     ti=time.time()
@@ -192,8 +197,6 @@ if __name__=="__main__":
     market_OK=Value('b',False)
 
     Homes=[]
-
-
 
     for i in range(1,nmbHome+1):
         h=Process(target=Home, args=(i,lockQueue,lockCount,queue,count,market_OK,lockWrite,clock_ok,temp,wind,weather_ok),)
